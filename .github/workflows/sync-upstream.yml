@@ -1,0 +1,68 @@
+name: Sync Upstream
+
+on:
+  schedule:
+    - cron: '0 0 * * *'  # 每天 UTC 0:00 运行
+  workflow_dispatch:  # 允许手动触发
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          ref: main
+
+      - name: Configure Git
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global advice.detachedHead false
+
+      - name: Clean and reset
+        run: |
+          # 清理所有未跟踪的文件
+          git clean -fd
+          # 重置所有更改
+          git reset --hard
+          # 删除所有远程分支
+          git remote prune origin
+          # 删除所有本地分支（除了main）
+          git branch | grep -v "main" | xargs git branch -D || true
+
+      - name: Add upstream remote
+        run: |
+          git remote add upstream https://github.com/kakaxi-1/IPTV.git || true
+          git fetch upstream main
+
+      - name: Update from upstream
+        run: |
+          # 保存工作流文件
+          mkdir -p .github/workflows_backup
+          cp .github/workflows/*.yml .github/workflows_backup/
+          
+          # 强制切换到上游状态
+          git checkout -B main upstream/main
+          
+          # 恢复工作流文件
+          mkdir -p .github/workflows
+          cp .github/workflows_backup/*.yml .github/workflows/
+          
+          # 添加前缀
+          sed -i 's/^更新时间,/素弦更新时间,/' ipv4.txt
+          sed -i 's/^更新时间,/素弦更新时间,/' ipv4.1.txt
+          
+          # 清空README.md
+          echo "" > README.md
+          
+          # 提交更改
+          git add ipv4.txt ipv4.1.txt README.md .github/workflows/
+          git commit -m "Update from upstream, add prefix and clear README"
+
+      - name: Push changes
+        run: |
+          git push origin main --force
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 

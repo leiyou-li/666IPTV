@@ -1,0 +1,83 @@
+name: Update Prefix
+
+on:
+  push:
+    paths:
+      - 'ipv4.txt'
+      - 'ipv4.1.txt'
+  workflow_dispatch:  # 添加手动触发选项
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Resolve conflicts
+        run: |
+          # 调试信息
+          echo "当前目录内容:" && ls -la
+
+          # 处理 ipv4.txt
+          if [ -f "ipv4.txt" ]; then
+            echo "处理 ipv4.txt..."
+            git checkout --ours ipv4.txt
+            sed -i '2s/^更新时间,/素弦更新时间,/' ipv4.txt || echo "警告: sed 命令未能更新 ipv4.txt 的第二行"
+            cat ipv4.txt | head -5  # 显示前5行以验证更改
+
+            # 检查是否存在 custom_channels.txt 文件
+            if [ -f "custom_channels.txt" ]; then
+              echo "发现 custom_channels.txt，准备追加内容..."
+              echo >> ipv4.txt
+              cat custom_channels.txt >> ipv4.txt
+              echo "已将 custom_channels.txt 的内容添加到 ipv4.txt"
+              cat ipv4.txt | tail -5  # 显示最后5行以验证追加
+            else
+              echo "未找到 custom_channels.txt 文件"
+            fi
+          else
+            echo "警告: 未找到 ipv4.txt 文件"
+          fi
+
+          # 处理 ipv4.1.txt
+          if [ -f "ipv4.1.txt" ]; then
+            echo "处理 ipv4.1.txt..."
+            git checkout --ours ipv4.1.txt
+            sed -i '2s/^更新时间,/素弦更新时间,/' ipv4.1.txt || echo "警告: sed 命令未能更新 ipv4.1.txt 的第二行"
+          else
+            echo "警告: 未找到 ipv4.1.txt 文件"
+          fi
+
+          # 处理 epg.xml
+          if [ -f "epg.xml" ]; then
+            echo "处理 epg.xml..."
+            git checkout --ours epg.xml
+          else
+            echo "警告: 未找到 epg.xml 文件"
+          fi
+
+      - name: Stage resolved files
+        run: |
+          git add ipv4.txt ipv4.1.txt epg.xml
+          if [ -f "custom_channels.txt" ]; then
+            git add custom_channels.txt
+          fi
+          git status  # 显示暂存状态
+
+      - name: Commit changes
+        run: |
+          git commit -m "Resolve conflicts and add prefix" || echo "没有更改需要提交"
+
+      - name: Push changes
+        run: |
+          git push origin main || echo "推送失败，请检查权限和网络连接"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
